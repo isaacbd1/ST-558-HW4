@@ -1,0 +1,197 @@
+---
+title: "Test Review & Manipulating Data"
+format: html
+editor: visual
+---
+
+## Task 1: Conceptual Questions
+
+1.  
+
+    > The relative path would just be "homework".
+
+2.  
+
+    > Packages are useful because they are a collection of functions that can do all sorts of different things, so instead of having to code everything up ourselves in BaseR, we can instead re-use code that other people wrote by calling their package. Moreover, another benefit to using packages is that the functions within the package are written in a consistent syntax, reducing potential conflicts/errors in our code.
+
+3.  
+
+    > Git is a version control software that tracks changes made to files. Github is an online hosting service for Git-based projects; on Github programmers can store, share, and and edit files that they have been working on, and in particular easily collaborate with others.
+
+4.  
+
+    > A tibble is a special type of data frame. They look a little nicer than a generic data frame, and more importantly they do not coerce down to a vector when we subset to only one column using "\[" (i.e. it just becomes a smaller tibble).
+
+5.  
+
+    > Using the chaining operator, we can rewrite the function as:
+
+    ```{r}
+    library(tidyverse)
+    iris |>
+      select(starts_with("Petal"), Species) |>
+      filter(Petal.Length < 1.55) |>
+      arrange(Species)
+    ```
+
+    Much easier to read and understand!
+
+## Task 2: Reading Delimited Data
+
+First, we will read data into R from the Glass data dataset available at https://www4.stat.ncsu.edu/\~online/datasets/glass.data. We do this using the tidyverse package, calling the read_csv() function; note that since the data does not have column names, we add that ourselves using the function's arguments.
+
+```{r}
+library(tidyverse)
+
+glass_data <- read_csv("https://www4.stat.ncsu.edu/~online/datasets/glass.data", col_names = c("Id", "RI", "Na", "Mg", "Al", "Si", "K", "Ca", "Ba", "Fe", "Type of Glass"))
+
+glass_data
+```
+
+Next, we rename the values in the "Type of Glass" column using the mutate function.
+
+```{r}
+glass_data |>
+  mutate(`Type of Glass` = ifelse(`Type of Glass` == 1, "building_windows_float_processed", 
+          ifelse(`Type of Glass` == 2, "building_windows_non_float_process",
+                 ifelse(`Type of Glass` == 3, "vehicle_windows_float_processed",
+                        ifelse(`Type of Glass` == 4, "vehicle_windows_non_float_processed (none in this database)",
+                               ifelse(`Type of Glass` == 5, "containers",
+                                      ifelse(`Type of Glass` == 6, "tableware",
+                                             ifelse(`Type of Glass` == 7, "headlamps","Unknown"))))))))
+```
+
+Next, we use the filter() function to keep only the observations where the "Fe" variable is less than 0.2 and the "Type of Glass" variable is either "tableware" or "headlamps."
+
+```{r}
+glass_data |>
+  mutate(`Type of Glass` = ifelse(`Type of Glass` == 1, "building_windows_float_processed", 
+          ifelse(`Type of Glass` == 2, "building_windows_non_float_process",
+                 ifelse(`Type of Glass` == 3, "vehicle_windows_float_processed",
+                        ifelse(`Type of Glass` == 4, "vehicle_windows_non_float_processed (none in this database)",
+                               ifelse(`Type of Glass` == 5, "containers",
+                                      ifelse(`Type of Glass` == 6, "tableware",
+                                             ifelse(`Type of Glass` == 7, "headlamps","Unknown")))))))) |> 
+  filter(Fe < 0.2, `Type of Glass` == "tableware" | `Type of Glass` == "headlamps")
+```
+
+Now we'll look at another dataset, available at https://www4.stat.ncsu.edu/\~online/datasets/yeast.data. As before, we need to read the data into R (note that the file is delimited by 2 spaces).
+
+```{r}
+yeast <- read_delim("https://www4.stat.ncsu.edu/~online/datasets/yeast.data", delim = "  ", col_names = c("seq_name", "mcg", "gvh", "alm", "mit", "erl", "pox", "vac", "nuc", "class"))
+
+yeast
+```
+
+Next, we remove the "seq_name" and "nuc" columns.
+
+```{r}
+yeast |>
+  select(mcg:vac, class)
+```
+
+Lastly, we add columns corresponding to the mean and median of each numeric variable ("mcg", "gvh", "alm", "mit", "erl", "pox", and "vac") at each class grouping.
+
+```{r}
+yeast |>
+  select(mcg:vac, class) |>
+  group_by(class) |>
+  mutate(across(where(is.numeric), list(mean = mean, median = median), .names = "{.col}_{.fn}"))
+```
+
+## Task 3: Combining Excel and Delimited Data
+
+First we import excel data from the "white-wine" excel file and print out a tibble of the first sheet.
+
+```{r}
+library(readxl)
+
+#read in first sheet
+white_wine <- read_excel("white-wine.xlsx",
+                         sheet = excel_sheets("white-wine.xlsx")[1])
+
+white_wine
+```
+
+Next we rename the column names by reading in the variable names from the second sheet of the "white wine" excel file, and then overwriting the current column names with with the data from the second sheet.
+
+```{r}
+#read in second sheet
+white_wine_variables <- read_excel("white-wine.xlsx",
+                                   sheet = excel_sheets("white-wine.xlsx")[2])
+
+white_wine_variables
+```
+
+```{r}
+#overwrite column names of white_wine with the data from white_wine_variables
+colnames(white_wine) <- white_wine_variables$Variables
+
+white_wine
+```
+
+Now we want to add a column to the "white_wine" tibble which indicates the color of the wine (that is, it will have "white" for every entry since all wines are white).
+
+```{r}
+white_wine$`Wine Color` <- "white"
+
+white_wine
+```
+
+Next we will import data from the semi-colon delimited file red-wine.csv available at https://www4.stat.ncsu.edu/\~online/datasets/red-wine.csv.
+
+```{r}
+#read in the data from the file
+red_wine <- read_delim("https://www4.stat.ncsu.edu/~online/datasets/red-wine.csv",
+                       delim = ";")
+
+#replace the column names with the data from the second sheet of the white-wine excel file
+colnames(red_wine) <- white_wine_variables$Variables
+
+#add column indicating the color of the wine (i.e. it will have "red" for every entry)
+red_wine$`Wine Color` <- "red"
+
+red_wine
+```
+
+Now that we have two tibbles with the same column variables, we will combine them to create one big tibble.
+
+```{r}
+wine_data <- bind_rows(white_wine, red_wine)
+wine_data 
+```
+
+Next we filter out everything except the observations where "quality" is greater than 6.5 and "alcohol" is less than 132.
+
+```{r}
+wine_data |>
+  filter(quality > 6.5 & alcohol < 132)
+```
+
+And now we sort the data from the above tibble so that the "quality" column is ordered from highest to lowest.
+
+```{r}
+wine_data |> 
+  filter(quality > 6.5 & alcohol < 132) |>
+  arrange(desc(quality))
+```
+
+From the tibble above, we now select just the columns that contain "acid" in their name, and the columns "alcohol", "quality", and "Wine Color" (i.e. type).
+
+```{r}
+wine_data |> 
+  filter(quality > 6.5 & alcohol < 132) |>
+  arrange(desc(quality)) |>
+  select(contains("acid"), "alcohol", "quality", "Wine Color")
+```
+
+Lastly, from the above tibble we add columns computing the mean and standard deviation for the value of "alcohol" for each setting of (i.e. grouped by) the quality variable.
+
+```{r}
+wine_data |> 
+  filter(quality > 6.5 & alcohol < 132) |>
+  arrange(desc(quality)) |>
+  select(contains("acid"), "alcohol", "quality", "Wine Color") |>
+  group_by(quality) |>
+  mutate(across(alcohol, list(mean = mean, sd = sd), .names = "{.col}_{.fn}"))
+```
